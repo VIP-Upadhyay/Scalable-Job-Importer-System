@@ -1,0 +1,144 @@
+const JOB_STATUSES = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  ARCHIVED: 'archived'
+};
+
+const IMPORT_STATUSES = {
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled'
+};
+
+const JOB_TYPES = {
+  FULL_TIME: 'full-time',
+  PART_TIME: 'part-time',
+  CONTRACT: 'contract',
+  FREELANCE: 'freelance',
+  INTERNSHIP: 'internship',
+  TEMPORARY: 'temporary'
+};
+
+const QUEUE_EVENTS = {
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  PROGRESS: 'progress',
+  WAITING: 'waiting',
+  ACTIVE: 'active',
+  STALLED: 'stalled',
+  REMOVED: 'removed',
+  CLEANED: 'cleaned'
+};
+
+const LOG_LEVELS = {
+  ERROR: 'error',
+  WARN: 'warn',
+  INFO: 'info',
+  HTTP: 'http',
+  DEBUG: 'debug'
+};
+
+const HTTP_STATUS_CODES = {
+  OK: 200,
+  CREATED: 201,
+  NO_CONTENT: 204,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+  UNPROCESSABLE_ENTITY: 422,
+  INTERNAL_SERVER_ERROR: 500,
+  BAD_GATEWAY: 502,
+  SERVICE_UNAVAILABLE: 503
+};
+
+const API_RATE_LIMITS = {
+  WINDOW_MS: 15 * 60 * 1000, // 15 minutes
+  MAX_REQUESTS: 100, // limit each IP to 100 requests per windowMs
+  MESSAGE: 'Too many requests from this IP, please try again later.'
+};
+
+const DEFAULT_PAGINATION = {
+  PAGE: 1,
+  LIMIT: 20,
+  MAX_LIMIT: 100
+};
+
+const EXTERNAL_API_CONFIG = {
+  TIMEOUT: 30000, // 30 seconds
+  RETRIES: 3,
+  RETRY_DELAY: 1000, // 1 second
+  USER_AGENT: 'JobImporter/1.0'
+};
+
+const QUEUE_CONFIG = {
+  DEFAULT_CONCURRENCY: 5,
+  MAX_CONCURRENCY: 20,
+  DEFAULT_ATTEMPTS: 3,
+  MAX_ATTEMPTS: 5,
+  BACKOFF_DELAY: 2000,
+  REMOVE_ON_COMPLETE: 100,
+  REMOVE_ON_FAIL: 50
+};
+
+const DATABASE_CONFIG = {
+  MAX_POOL_SIZE: 10,
+  SERVER_SELECTION_TIMEOUT: 5000,
+  SOCKET_TIMEOUT: 45000,
+  HEARTBEAT_FREQUENCY: 10000
+};
+
+const REDIS_CONFIG = {
+  CONNECT_TIMEOUT: 10000,
+  COMMAND_TIMEOUT: 5000,
+  RETRY_DELAY_ON_FAILOVER: 100,
+  MAX_RETRIES_PER_REQUEST: 3,
+  KEEP_ALIVE: 30000
+};
+
+const VALIDATION_RULES = {
+  JOB: {
+    TITLE_MAX_LENGTH: 200,
+    COMPANY_MAX_LENGTH: 100,
+    DESCRIPTION_MAX_LENGTH: 5000,
+    LOCATION_MAX_LENGTH: 100,
+    CATEGORY_MAX_LENGTH: 50,
+    EXTERNAL_ID_MAX_LENGTH: 100
+  },
+  IMPORT_LOG: {
+    FILE_NAME_MAX_LENGTH: 500,
+    ERROR_MESSAGE_MAX_LENGTH: 1000
+  },
+  SEARCH: {
+    MIN_LENGTH: 2,
+    MAX_LENGTH: 200
+  }
+};
+
+const CRON_SCHEDULES = {
+  EVERY_HOUR: '0 */1 * * *',
+  EVERY_2_HOURS: '0 */2 * * *',
+  EVERY_6_HOURS: '0 */6 * * *',
+  EVERY_12_HOURS: '0 */12 * * *',
+  DAILY_MIDNIGHT: '0 0 * * *',
+  WEEKLY_SUNDAY: '0 0 * * 0'
+};
+
+module.exports = {
+  JOB_STATUSES,
+  IMPORT_STATUSES,
+  JOB_TYPES,
+  QUEUE_EVENTS,
+  LOG_LEVELS,
+  HTTP_STATUS_CODES,
+  API_RATE_LIMITS,
+  DEFAULT_PAGINATION,
+  EXTERNAL_API_CONFIG,
+  QUEUE_CONFIG,
+  DATABASE_CONFIG,
+  REDIS_CONFIG,
+  VALIDATION_RULES,
+  CRON_SCHEDULES
+};
