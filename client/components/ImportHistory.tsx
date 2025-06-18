@@ -146,7 +146,7 @@ export default function ImportHistory() {
                 key={log._id}
                 className="hover:bg-gray-50 cursor-pointer"
                 onClick={() => {
-                  console.error(log.errorDetails);
+                  // console.error(log.errorDetails);
                   setSelectedLog(log)
                 }}
               >

@@ -29,26 +29,16 @@ class ApiFetcherService {
 
       logger.info(`Received ${response.data.length} characters of XML data`);
 
-      // Try to clean/fix common XML issues before parsing
-      let cleanedXML = this.cleanXMLData(response.data);
-      
       const parser = new xml2js.Parser({ 
         explicitArray: false,
         ignoreAttrs: false,
         mergeAttrs: true,
         explicitCharkey: false,
         trim: true,
-        normalize: true,
-        // More lenient parsing options
-        strict: false,           // Allow malformed XML
-        sanitize: true,          // Sanitize input
-        normalize: true,         // Normalize whitespace
-        normalizeTags: false,    // Don't change tag case
-        attrkey: '$',           // Attribute key
-        charkey: '_'            // Character key
+        normalize: true
       });
 
-      const result = await parser.parseStringPromise(cleanedXML);
+      const result = await parser.parseStringPromise(response.data);
       const jobs = this.normalizeJobData(result, url);
       
       logger.info(`Successfully parsed and normalized ${jobs.length} jobs from ${url}`);
@@ -58,86 +48,17 @@ class ApiFetcherService {
       logger.error(`Error fetching from ${url}:`, {
         message: error.message,
         code: error.code,
-        status: error.response?.status,
-        lineNumber: error.line,
-        columnNumber: error.column,
-        character: error.char
+        status: error.response?.status
       });
-      
-      // If it's an XML parsing error, try alternative parsing
-      if (error.message.includes('Attribute without value') || error.message.includes('XML')) {
-        logger.info(`Attempting alternative XML parsing for ${url}...`);
-        return this.attemptAlternativeXMLParsing(url);
-      }
-      
       throw error;
     }
   }
 
-  // Clean XML data to fix common issues
-  cleanXMLData(xmlData) {
-    return xmlData
-      // Fix attributes without values (common issue)
-      .replace(/(\w+)=>\s*/g, '$1=""')
-      .replace(/(\w+)=\s*>/g, '$1="">')
-      // Fix unclosed tags
-      .replace(/<(\w+)([^>]*?)(?<!\/|\s)>/g, '<$1$2/>')
-      // Remove invalid characters
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-      // Fix common encoding issues
-      .replace(/&(?!amp;|lt;|gt;|quot;|apos;)/g, '&amp;')
-      .trim();
-  }
-
-  // Alternative parsing method for problematic feeds
-  async attemptAlternativeXMLParsing(url) {
-    try {
-      // Try fetching again with different approach
-      const response = await axios.get(url, {
-        timeout: 30000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; JobImporter/1.0)',
-          'Accept': 'application/rss+xml, application/xml, text/xml'
-        }
-      });
-
-      // More aggressive XML cleaning
-      let cleanedXML = response.data
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
-        .replace(/&(?![a-zA-Z0-9#]+;)/g, '&amp;')          // Fix unescaped ampersands
-        .replace(/attribute\s*=\s*>/gi, 'attribute="">')    // Fix empty attributes
-        .replace(/<([^>]+)(?<!\/)\s*>/g, '<$1/>');         // Self-close empty tags
-
-      // Try with even more lenient parser
-      const parser = new xml2js.Parser({
-        explicitArray: false,
-        ignoreAttrs: true,        // Ignore problematic attributes
-        strict: false,
-        sanitize: true,
-        normalize: true,
-        trim: true
-      });
-
-      const result = await parser.parseStringPromise(cleanedXML);
-      const jobs = this.normalizeJobData(result, url);
-      
-      logger.info(`✅ Alternative parsing successful: ${jobs.length} jobs extracted`);
-      return jobs;
-      
-    } catch (alternativeError) {
-      logger.error(`❌ Alternative parsing also failed for ${url}:`, alternativeError.message);
-      
-      // Return empty array instead of throwing error
-      return [];
-    }
-  }
-
-  // Rest of your existing methods...
   normalizeJobData(xmlData, sourceUrl) {
-    // Your existing implementation
     const jobs = [];
     
     try {
+      // Extract items from RSS structure
       let items = [];
       
       if (xmlData.rss && xmlData.rss.channel && xmlData.rss.channel.item) {
@@ -150,6 +71,7 @@ class ApiFetcherService {
 
       items.forEach((item, index) => {
         try {
+          // Extract and clean data
           const job = {
             externalId: this.extractExternalId(item, sourceUrl, index),
             title: this.extractTitle(item),
@@ -165,55 +87,93 @@ class ApiFetcherService {
             sourceUrl: sourceUrl
           };
 
+          // Validate required fields before adding
           if (this.validateJob(job)) {
             jobs.push(job);
+            
+            if (index < 2) { // Log first 2 jobs for debugging
+              logger.info(`Sample job ${index + 1}:`, {
+                externalId: job.externalId,
+                title: job.title,
+                company: job.company,
+                source: job.source,
+                location: job.location,
+                jobType: job.jobType
+              });
+            }
+          } else {
+            logger.warn(`Skipping invalid job ${index + 1}: Missing required fields`, {
+              externalId: job.externalId || 'MISSING',
+              title: job.title || 'MISSING',
+              company: job.company || 'MISSING',
+              source: job.source || 'MISSING'
+            });
           }
         } catch (itemError) {
-          logger.warn(`Error processing item ${index + 1}:`, itemError.message);
+          logger.warn(`Error processing item ${index + 1} from ${sourceUrl}:`, itemError.message);
         }
       });
     } catch (error) {
-      logger.error(`Error normalizing data:`, error.message);
+      logger.error(`Error normalizing data from ${sourceUrl}:`, error.message);
     }
 
+    logger.info(`Successfully normalized ${jobs.length} valid jobs from ${sourceUrl}`);
     return jobs;
   }
 
-  // Your existing extraction methods...
+  // Enhanced data extraction methods
   extractExternalId(item, sourceUrl, index) {
+    // Try multiple sources for external ID
     const id = item.id || 
                item.guid || 
                this.extractIdFromUrl(item.link) ||
                `${this.extractSourceName(sourceUrl)}-${Date.now()}-${index}`;
+    
     return String(id).trim();
+  }
+
+  extractIdFromUrl(url) {
+    if (!url) return null;
+    // Extract ID from URL like: https://jobicy.com/jobs/120487-senior-community-manager
+    const match = url.match(/\/(\d+)-/);
+    return match ? match[1] : null;
   }
 
   extractTitle(item) {
     let title = item.title || 'Untitled Position';
+    
+    // Clean up HTML entities and extra characters
     if (typeof title === 'string') {
       title = title
-        .replace(/&#8211;/g, '–')
-        .replace(/&#038;/g, '&')
-        .replace(/&#8217;/g, "'")
+        .replace(/&#8211;/g, '–')  // Replace HTML entity for en dash
+        .replace(/&#038;/g, '&')   // Replace HTML entity for ampersand
+        .replace(/&#8217;/g, "'")  // Replace HTML entity for apostrophe
+        .replace(/&#124;/g, '|')   // Replace HTML entity for pipe
         .trim();
     }
+    
     return title;
   }
 
   extractCompany(item) {
+    // Handle the job_listing:company field properly
     const company = item['job_listing:company'] || 
                    item.company || 
                    item['dc:creator'] || 
                    item.author ||
                    'Unknown Company';
+    
     return String(company).trim();
   }
 
   extractLocation(item) {
+    // Handle the job_listing:location field properly
     const location = item['job_listing:location'] || 
                     item.location || 
                     item['job:location'] ||
+                    item.region ||
                     '';
+    
     return String(location).trim();
   }
 
@@ -221,15 +181,18 @@ class ApiFetcherService {
     let description = item.description || 
                      item.summary || 
                      item['content:encoded'] ||
+                     item.content ||
                      '';
     
+    // Clean HTML tags and CDATA if present
     if (typeof description === 'string') {
       description = description
-        .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1')
-        .replace(/<[^>]*>/g, '')
-        .replace(/&[#\w]+;/g, ' ')
+        .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1')  // Remove CDATA wrapper
+        .replace(/<[^>]*>/g, '')                   // Remove HTML tags
+        .replace(/&[#\w]+;/g, ' ')                // Remove HTML entities
         .trim();
       
+      // Limit description length
       if (description.length > 1000) {
         description = description.substring(0, 1000) + '...';
       }
@@ -239,19 +202,29 @@ class ApiFetcherService {
   }
 
   extractJobType(item) {
+    // Handle the job_listing:job_type field properly
     let jobType = item['job_listing:job_type'] || 
                  item['job:type'] || 
-                 item.type ||
+                 item.type || 
+                 item['job:employment_type'] ||
                  'Full Time';
     
+    // Normalize job type values
     if (typeof jobType === 'string') {
       jobType = jobType.toLowerCase().trim();
+      
+      // Map common variations
       const jobTypeMap = {
         'full time': 'full-time',
         'fulltime': 'full-time',
         'part time': 'part-time',
-        'parttime': 'part-time'
+        'parttime': 'part-time',
+        'contract': 'contract',
+        'freelance': 'freelance',
+        'internship': 'internship',
+        'temporary': 'temporary'
       };
+      
       jobType = jobTypeMap[jobType] || jobType;
     }
     
@@ -259,6 +232,7 @@ class ApiFetcherService {
   }
 
   extractCategory(sourceUrl) {
+    // Extract category from URL parameters
     try {
       const url = new URL(sourceUrl);
       const categories = url.searchParams.get('job_categories');
@@ -269,19 +243,30 @@ class ApiFetcherService {
   }
 
   extractSalary(item) {
-    return item['job:salary'] || item.salary || '';
+    return item['job:salary'] || 
+           item.salary || 
+           item['job:compensation'] ||
+           '';
   }
 
   extractUrl(item, sourceUrl) {
-    return item.link || item.url || item.guid || sourceUrl;
+    return item.link || 
+           item.url || 
+           item.guid ||
+           sourceUrl;
   }
 
   extractPublishedDate(item) {
-    const dateStr = item.pubDate || item.published || item['dc:date'];
+    const dateStr = item.pubDate || 
+                   item.published || 
+                   item['dc:date'] ||
+                   item.date;
+    
     if (dateStr) {
       const date = new Date(dateStr);
       return isNaN(date.getTime()) ? new Date() : date;
     }
+    
     return new Date();
   }
 
@@ -294,10 +279,47 @@ class ApiFetcherService {
     }
   }
 
+  // Validate job data before saving
   validateJob(job) {
     const required = ['externalId', 'title', 'company', 'source'];
     const missing = required.filter(field => !job[field] || job[field].trim() === '');
-    return missing.length === 0;
+    
+    if (missing.length > 0) {
+      logger.warn(`Job validation failed. Missing fields: ${missing.join(', ')}`);
+      return false;
+    }
+    
+    // Additional validation
+    if (job.title.length < 3) {
+      logger.warn('Job validation failed: Title too short');
+      return false;
+    }
+    
+    if (job.company.length < 2) {
+      logger.warn('Job validation failed: Company name too short');
+      return false;
+    }
+    
+    return true;
+  }
+
+  async fetchAllJobs() {
+    const allJobs = [];
+    const errors = [];
+
+    for (const url of this.apiUrls) {
+      try {
+        const jobs = await this.fetchJobsFromUrl(url);
+        allJobs.push(...jobs);
+        logger.info(`Successfully fetched ${jobs.length} jobs from ${url}`);
+      } catch (error) {
+        errors.push({ url, error: error.message });
+        logger.error(`Failed to fetch from ${url}:`, error.message);
+      }
+    }
+
+    logger.info(`Total jobs fetched: ${allJobs.length}, Errors: ${errors.length}`);
+    return { jobs: allJobs, errors };
   }
 }
 

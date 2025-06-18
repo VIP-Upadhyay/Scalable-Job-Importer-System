@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: job-importer-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: job-importer
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      # - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - job-importer-network
+
+  # Redis Cache/Queue
+  redis:
+    image: redis:7.2-alpine
+    container_name: job-importer-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass "redis123"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - job-importer-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: dev
+    container_name: job-importer-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/job-importer?authSource=admin
+      REDIS_URL: redis://:redis123@redis:6379
+      CORS_ORIGIN: http://localhost:3000
+      LOG_LEVEL: info
+      CRON_ENABLED: true
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+      - ./server/logs:/app/logs
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - job-importer-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Frontend
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      target: dev
+    container_name: job-importer-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
+      NODE_ENV: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - job-importer-network
+
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  job-importer-network:
+    driver: bridge

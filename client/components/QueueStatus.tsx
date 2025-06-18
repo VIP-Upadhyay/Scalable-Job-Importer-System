@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 
 interface QueueStats {
+  data:any;
   waiting: number;
   active: number;
   completed: number;
