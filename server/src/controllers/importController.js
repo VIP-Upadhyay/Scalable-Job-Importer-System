@@ -102,7 +102,7 @@ class ImportController {
       }
 
       let { urls } = req.body;
-
+      console.log("url",urls);
       // If no URLs provided, use default ones
       if (!urls || !Array.isArray(urls) || urls.length === 0) {
         urls = config.externalApis.sources;
@@ -133,7 +133,7 @@ class ImportController {
         try {
           const importLog = await JobImportService.createImportLog(url);
           importLogs.push(importLog);
-
+          console.log("imported logs", importLog);
           const job = await QueueService.addJobImportTask({
             sourceUrl: url,
             logId: importLog._id,

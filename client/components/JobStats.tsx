@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, SetStateAction } from 'react';
 import axios from 'axios';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface JobStats {
+  data: any;
   totalJobs: number;
   sourceStats: Array<{
     _id: string;
@@ -193,7 +194,7 @@ export default function JobStats() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {/* {stats && stats.sourceStats.map((source) => (
+              {stats && stats.sourceStats.map((source) => (
                 <tr key={source._id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {source._id}
@@ -231,7 +232,7 @@ export default function JobStats() {
                     </div>
                   </td>
                 </tr>
-              ))} */}
+              ))}
             </tbody>
           </table>
         </div>

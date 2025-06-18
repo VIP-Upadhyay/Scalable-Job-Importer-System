@@ -30,6 +30,27 @@ class JobWorker {
 
       // Fetch jobs from API
       const jobs = await ApiFetcherService.fetchJobsFromUrl(sourceUrl);
+
+      if (jobs.length === 0) {
+        logger.warn(`No jobs found from ${sourceUrl}`);
+        
+        // Update import log with warning but don't fail
+        const exp = await JobImportService.updateImportLog(logId, {
+          totalFetched: 0,
+          totalImported: 0,
+          newJobs: 0,
+          updatedJobs: 0,
+          failedJobs: 0,
+          errorDetails: [{
+            message: 'No jobs found in feed',
+            timestamp: new Date()
+          }],
+          processingTime: Date.now() - startTime
+        }, 'completed');
+
+        console.log(" \n\n\n\nerror  ",exp);
+        return { success: true, stats: { message: 'No jobs found' } };
+      }
       
       // Import jobs into database
       const stats = await JobImportService.importJobs(jobs, sourceUrl, logId);
@@ -47,12 +68,14 @@ class JobWorker {
       logger.error(`Job processing failed for ${sourceUrl}:`, error);
       
       // Update import log with error
-      await JobImportService.updateImportLog(logId, {
-        errors: [{ message: error.message, timestamp: new Date() }],
+      const exp = await JobImportService.updateImportLog(logId, {
+        errorDetails: [{ message: error.message, timestamp: new Date() }],  
         processingTime: Date.now() - startTime
       }, 'failed');
 
-      throw error;
+      // console.log(" \n\n\n\nerror  ",exp);
+
+      return { success: false, error: error.message };
     }
   }
 

@@ -15,10 +15,11 @@ interface ImportLog {
   updatedJobs: number;
   failedJobs: number;
   processingTime?: number;
-  errors: Array<{ message: string; timestamp: string }>;
+  errorDetails: Array<{ message: string; timestamp: string }>;
 }
 
 interface ImportHistoryResponse {
+  data: any;
   logs: ImportLog[];
   totalPages: number;
   currentPage: number;
@@ -44,7 +45,7 @@ export default function ImportHistory() {
       const response = await axios.get<ImportHistoryResponse>(
         `${API_BASE}/imports/history?page=${currentPage}&limit=10`
       );
-      // console.log(response.data.data.logs);
+      console.log(response.data.data.logs);
       setLogs(response.data.data.logs);
       // console.log();
       setTotalPages(response.data.data.pagination.totalPages);
@@ -134,9 +135,9 @@ export default function ImportHistory() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Duration
-              </th>
+              </th> */}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -144,7 +145,10 @@ export default function ImportHistory() {
               <tr
                 key={log._id}
                 className="hover:bg-gray-50 cursor-pointer"
-                onClick={() => setSelectedLog(log)}
+                onClick={() => {
+                  console.error(log.errorDetails);
+                  setSelectedLog(log)
+                }}
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <div className="max-w-xs truncate" title={log.fileName}>
@@ -171,9 +175,9 @@ export default function ImportHistory() {
                     {log.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {formatDuration(log.processingTime)}
-                </td>
+                </td> */}
               </tr>
             ))}
           </tbody>
@@ -271,14 +275,15 @@ export default function ImportHistory() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Processing Time</label>
                     <p className="text-sm text-gray-900">{formatDuration(selectedLog.processingTime)}</p>
+                    {/* <p className="text-sm text-gray-900">{selectedLog.errorsDetails.toString()}</p> */}
                   </div>
                 </div>
 
-                {selectedLog.errors && selectedLog.errors.length > 0 && (
+                {selectedLog.errorDetails && selectedLog.errorDetails.length > 0 && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Errors</label>
                     <div className="max-h-40 overflow-y-auto space-y-2">
-                      {selectedLog.errors.map((error, index) => (
+                      {selectedLog.errorDetails.map((error, index) => (
                         <div key={index} className="bg-red-50 border border-red-200 rounded p-2">
                           <p className="text-sm text-red-800">{error.message}</p>
                           <p className="text-xs text-red-600">{new Date(error.timestamp).toLocaleString()}</p>
